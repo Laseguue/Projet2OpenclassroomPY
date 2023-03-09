@@ -2,48 +2,65 @@ import csv
 import requests
 import os
 from bs4 import BeautifulSoup
-
+import logging
+logging.basicConfig(level=logging.DEBUG,
+                    filename="scrap.log", 
+                    filemode="a", 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def extract_product_info(product_url):
-    """Fonction pour extraire les informations d'un produit et télécharger son image"""
     page = requests.get(product_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    # Extraction des informations du produit
     products = soup.findAll('article')
     product_info = {}
     product_info['product_page_url'] = product_url
     try:
         product_info['upc'] = soup.find('th', string='UPC').find_next('td').get_text()
+        logging.info("upc ok")
     except AttributeError:
         product_info['upc'] = " N/A "
+        logging.info("upc NA")
     product_info['title'] = soup.find('h1').text
     try:
         product_info['price_excluding_tax'] = soup.find('th', string='Price (excl. tax)').find_next('td').get_text()[1:]
+        logging.info("price_excluding_tax ok")
     except AttributeError:
         product_info['price_excluding_tax'] = " N/A "
+        logging.info("price_excluding_tax NA")
     try:
         product_info['price_including_tax'] = soup.find('th', string='Price (incl. tax)').find_next('td').get_text()[1:]
+        logging.info("price_including_tax ok")
     except AttributeError:
         product_info['price_including_tax'] = " N/A "
+        logging.info("price_including_tax NA")
     try:
         product_info['number_available'] = soup.find('th', string='Availability').find_next('td').get_text().strip()[10:]
+        logging.info("number_available ok")
     except AttributeError:
         product_info['number_available'] = " N/A "
+        logging.info("number_available NA")
     try:
         product_info['product_description'] = soup.find('div', {'id': 'product_description'}).find_next('p').get_text()
+        logging.info("product_description ok")
     except AttributeError:
         product_info['product_description'] = " N/A "
+        logging.info("product_description NA")
     try:
-        product_info['category'] = soup.find('ul', {'class': 'breadcrumb'}).find_all('a')[2].get_text().strip() # erreur ici mais pq ? html parser met tout au format text directement donc mon get_text prend toute la ligne en compte ? pourquoi fonctionne avec l'autre script ? 
+        product_info['category'] = soup.find('ul', {'class': 'breadcrumb'}).find_all('a')[2].get_text().strip()  
+        logging.info("category ok")
     except AttributeError:
         product_info['category'] = "NA"
+        logging.info("category NA")
     try:
         product_info['review_rating'] = soup.find('p', {'class': 'star-rating'})['class'][1]
+        logging.info("review_rating ok")
     except AttributeError:
         product_info['review_rating'] = " N/A "
+        logging.info("review_rating NA")
     except TypeError:
         product_info['review_rating'] = " N/A "
+        logging.info("review_rating NA")
     try:
         image_url = base_url + soup.find('img')['src'][6:]
         product_info['image_url'] = image_url
@@ -60,9 +77,9 @@ def extract_product_info(product_url):
             with open(image_path, 'wb') as f:
                 f.write(response.content)
 
-                print(f"Image {image_name} enregistrée avec succès !")
+                logging.info(f"Image {image_name} enregistrée avec succès !")
         else:
-            print(f"La requête pour l'image {image_url} a échoué.")
+            logging.info(f"La requête pour l'image {image_url} a échoué.")
     except AttributeError:
         product_info['image_url'] = " N/A "
     except TypeError:
@@ -78,6 +95,7 @@ def extract_categories_links(index_url, base_url):
     categories_list = soup.find('ul', {'class': 'nav-list'}).find_all('a')  
     for category in categories_list:
         categories_links.append({'category': category.text, 'category_url': base_url + category['href']})
+        logging.info("category add to liste")
 
     return categories_links
 
@@ -95,6 +113,7 @@ def write_product_category_csv(category_name, products_info):
         writer.writeheader()
         for product_info in products_info:
             writer.writerow(product_info)
+            logging.info("info_produits_write ok")
 
 
 
@@ -122,13 +141,16 @@ def create_category_csv(categories_links, base_url):
             next_page = soup.find('li', {'class': 'next'})
             if next_page is not None:
                 current_page_url = base_url + next_page.find('a')['href']
+                logging.info("Next_page ok")
             else:
                 current_page_url = None
+                logging.info("Next_page NA")
         write_product_category_csv(category_name, products_info)
 
 
 
 if __name__ == '__main__':
+    logging.info("Launching the script")
     base_url = 'http://books.toscrape.com/'
     index_url = base_url + 'index.html'
     categories_links = extract_categories_links(index_url, base_url)
